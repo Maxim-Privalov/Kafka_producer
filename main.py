@@ -1,4 +1,6 @@
 import FreeSimpleGUI as sg
+from kafka import KafkaProducer
+import json
 
 layout = [  
             [sg.Button("Добавить таблицу")],
@@ -104,7 +106,21 @@ def main():
                     line = tables[table_name][line_index]
                     for field in line.keys():
                         line[field] = values[f"-{table_name}-{field}-{line_index}-"]
-            print(tables)
+
+            producer = KafkaProducer(
+                bootstrap_servers='localhost:9092',
+                value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                retries=5,
+                acks='all',
+                compression_type='gzip'
+            )
+            future = producer.send('tables', value=tables)
+            result = future.get(timeout=10)
+
+            print(f"Успешно отправлено: topic=tables, partition={result.partition}, offset={result.offset}")            
+            producer.flush()
+            producer.close()
+
         if event in tables.keys():
             selected_table = event
 
